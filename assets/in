@@ -1,0 +1,218 @@
+#!/bin/bash
+# vim: set ft=sh
+
+set -e
+
+exec 3>&1 # make stdout available as fd 3 for the result
+exec 1>&2 # redirect all output to stderr for logging
+
+source $(dirname $0)/common.sh
+source $(dirname $0)/utils.sh
+
+destination=$1
+
+if [ -z "$destination" ]; then
+  echo "usage: $0 <path/to/destination>" >&2
+  exit 1
+fi
+
+# for jq
+PATH=/usr/local/bin:$PATH
+
+payload=$(mktemp $TMPDIR/pipelines-discovery-resource-request.XXXXXX)
+
+cat > $payload <&0
+
+log "Configuring git credentials"
+load_pubkey $payload
+configure_git_ssl_verification $payload
+configure_credentials $payload
+
+log "Parsing payload"
+uri=$(jq -r '.source.uri // ""' < $payload)
+branch=$(jq -r '.source.branch // ""' < $payload)
+git_config_payload=$(jq -r '.source.git_config // []' < $payload)
+commit_verification_key_ids=$(jq -r '(.source.commit_verification_key_ids // [])[]' < $payload)
+commit_verification_keys=$(jq -r '(.source.commit_verification_keys // [])[]' < $payload)
+gpg_keyserver=$(jq -r '.source.gpg_keyserver // "hkp://keys.gnupg.net/"' < $payload)
+
+ref=$(jq -r '.version.ref // "HEAD"' < $payload)
+
+fetch=$(jq -r '(.params.fetch // [])[]' < $payload)
+submodules=$(jq -r '(.params.submodules // "all")' < $payload)
+disable_git_lfs=$(jq -r '(.params.disable_git_lfs // false)' < $payload)
+
+configure_git_global "${git_config_payload}"
+
+if [ -z "$uri" ]; then
+  log "invalid payload (missing uri):" "$(cat $payload)"
+  exit 1
+fi
+
+branchflag=""
+if [ -n "$branch" ]; then
+  branchflag="--branch $branch"
+fi
+
+log "Cloning $uri in $destination"
+git clone --single-branch --depth 1 "$uri" $branchflag "$destination"
+
+cd "$destination"
+
+# get current branch before checking out specific reference since we won't be able to determine it later
+current_branch=$(git_current_branch)
+
+git checkout -q $ref
+
+invalid_key() {
+  log "Invalid GPG key in: ${commit_verification_keys}"
+  exit 2
+}
+
+commit_not_signed() {
+  commit_id=$(git rev-parse ${ref})
+  log "The commit ${commit_id} is not signed"
+  exit 1
+}
+
+if [ ! -z "${commit_verification_keys}" ] || [ ! -z "${commit_verification_key_ids}" ] ; then
+  if [ ! -z "${commit_verification_keys}" ]; then
+    echo "${commit_verification_keys}" | gpg --batch --import || invalid_key "${commit_verification_keys}"
+  fi
+  if [ ! -z "${commit_verification_key_ids}" ]; then
+    echo "${commit_verification_key_ids}" | \
+      xargs --no-run-if-empty -n1 gpg --batch --keyserver $gpg_keyserver --recv-keys
+  fi
+  git verify-commit $(git rev-list -n 1 $ref) || commit_not_signed
+fi
+
+if [ "$disable_git_lfs" != "true" ]; then
+  git lfs fetch
+  git lfs checkout
+fi
+
+log "$(git log -1 --oneline)"
+git clean --force --force -d
+
+if [ "$submodules" == "all" ]; then
+  git submodule update --init  $depthflag --recursive
+elif [ "$submodules" != "none" ]; then
+  submodules=$(echo $submodules | jq -r '(.[])')
+  for submodule in $submodules; do
+    git submodule update --init $depthflag --recursive $submodule
+  done
+fi
+
+if [ "$disable_git_lfs" != "true" ]; then
+  git submodule foreach "git lfs fetch && git lfs checkout"
+fi
+
+for branch in $fetch; do
+  git fetch origin $branch
+  git branch $branch FETCH_HEAD
+done
+
+if [ "$ref" == "HEAD" ]; then
+  return_ref=$(git rev-parse HEAD)
+else
+  return_ref=$ref
+fi
+
+jq -n "{
+  version: {ref: $(echo $return_ref | jq -R .)},
+  metadata: $(git_metadata)
+}" >&3
+
+# ------------------------------
+# Git repository is ready, now we will gather all pipeline configuration and files
+# and put them in the destination directory after removing the original git repository
+config=$(jq -r '.source.config // "concourse.json"' < "$payload")
+
+vars=$(jq -r '.params.vars // []' < "$payload")
+vars_from=$(jq -r '.params.vars_from // []' < "$payload")
+
+# if config file does not exist or isn't readable we exit with failure
+if [ ! -r "$config" ]; then
+  echo "Missing concourse file: $config"
+  exit 1
+fi
+
+WORK_DIR=$(mktemp -d $TMPDIR/pipelines-discovery-target.XXXXXX)
+
+# deletes the temp directory
+function cleanup {
+  rm -rf "$WORK_DIR"
+  log "Deleted temp working directory $WORK_DIR"
+}
+
+# register the cleanup function to be called on the EXIT signal
+trap cleanup EXIT
+
+result_config="${WORK_DIR}/${config}"
+echo "{}" > "$result_config"
+
+# gather all files
+files=$(jq -c '.pipelines // [] | .[]' < "$config")
+if [ -n "$files" ]; then
+  while read pipeline ; do
+    pipeline_name=$(echo "$pipeline" | jq -r '.name // ""')
+    pipeline_config=$(echo "$pipeline" | jq -r '.config // ""')
+    pipeline_branch_regex=$(echo "$pipeline" | jq -r '.branch // "."')
+
+    # verify required parameters
+    if [ -z "$pipeline_name" ]; then
+      log "Missing pipeline name" "$pipeline"
+      exit 1
+    fi
+
+    if [ -z "$pipeline_config" ]; then
+      log "Missing pipeline config" "$pipeline"
+      exit 1
+    fi
+
+    # verify config file is present
+    if [ ! -r "$pipeline_config" ]; then
+      log "Pipeline config for '$pipeline_name' not readable: $pipeline_config"
+      exit 1
+    fi
+
+    # only add pipeline if current branch matches branch regex
+    if echo "$current_branch" | grep -Ec "$pipeline_branch_regex" > /dev/null; then
+      # add vars and vars_from to pipeline and expose branch variable
+      pipeline=$(echo "$pipeline" | jq ". + {
+        vars: ( $vars + .vars + [ \"branch=$current_branch\" ]),
+        vars_from: ( $vars_from + .vars_from )
+      }")
+
+      # add pipeline to result config
+      jq -n "{
+        pipelines: ( $(jq '.pipelines // []' < "$result_config") + [ $pipeline ] )
+      }" > "$result_config"
+
+      # copy referenced config file to $WORK_DIR
+      copy_preserve_folder "$pipeline_config" "$WORK_DIR"
+
+      # copy var files to $WORK_DIR
+      var_files=$(echo -n "$vars_from" | jq -r '.[]')
+      if [ -n "$var_files" ]; then
+        while read var_file; do
+          if [ ! -r "$var_file" ]; then
+            log "Variables file to load can't be found: $var_file"
+            exit 1
+          fi
+
+          copy_preserve_folder "$var_file" "$WORK_DIR"
+        done <<< "$var_files"
+      fi
+    else
+      log "Skipping pipeline '$pipeline_name' because regex '$pipeline_branch_regex' does not match current branch '$current_branch'"
+    fi
+
+  done <<< "$files"
+fi
+
+# remove all files in $destination and copy pipeline files from $WORK_DIR
+# http://unix.stackexchange.com/questions/77127/rm-rf-all-files-and-all-hidden-files-without-error (answer from Gilles)
+cd "$destination"
+rm -rf ..?* .[!.]* *
+cp -R "$WORK_DIR/." ./
