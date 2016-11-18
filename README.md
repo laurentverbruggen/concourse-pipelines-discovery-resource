@@ -1,6 +1,7 @@
 # Pipelines Discovery Resource
 
 Tracks concourse pipelines in a [git](http://git-scm.com/) repository.
+
 It is based on the [concourse git resource](https://github.com/concourse/git-resource) so most configuration will be identical.
 
 ## Installing
@@ -114,10 +115,12 @@ resources:
     config: concourse_pipelines.json
 ```
 
-Fetching a repo:
+Fetching a repo and add credentials as variables file:
 
 ``` yaml
 - get: source-code
+  vars_from:
+  - source-code/credentials.yml
 ```
 
 Pipelines configuration file in repository:
@@ -155,6 +158,12 @@ It will return the same given ref as version.
 The resource folder will only contain the pipeline resources (config file and all files it references).
 You can use those files to generate pipelines in a concourse instance. (see [Concourse Pipelines Sync Resource](https://github.com/laurentverbruggen/concourse-pipelines-sync-resource))
 
+As an additional feature the branch name will be added as variable to the resulting pipelines configuration.
+The purpose is to allow repositories to generate different configuration for multiple branches.
+This is especially useful with [Concourse Bitbucket Pipelines Discovery Resource](https://github.com/laurentverbruggen/concourse-bitbucket-pipelines-discovery-resource)
+in combination with [Concourse Bitbucket Pullrequest Resource](https://github.com/laurentverbruggen/concourse-bitbucket-pullrequest-resource).
+When discovering multiple branches you will want to restrict scanning for pull requests to branches for which a pullrequest pipeline was created.
+
 Submodules are initialized and updated recursively.
 
 #### Parameters
@@ -165,6 +174,11 @@ Submodules are initialized and updated recursively.
   submodules are fetched.
 
 * `disable_git_lfs`: *Optional.* If `true`, will not fetch Git LFS files.
+
+* `vars`: *Optional.* Adds vars to the resulting concourse configuration file.
+
+* `vars_from`: *Optional.* Adds variable files to the resulting concourse configuration file and
+  references them in the resource folder with the same relative path as passed for this config.
 
 Note: no depth parameter is defined (like in git resource) since it is useless here.
 
