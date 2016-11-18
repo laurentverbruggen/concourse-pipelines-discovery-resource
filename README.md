@@ -81,13 +81,13 @@ on adding `resource_types` to a pipeline config.
 * `config`: *Optional.* (default: concourse.json) The name of the JSON file containing pipeline configuration for this source.
   Configuration can specify an array of pipeline objects, where each objects holds the following fields:
 
-      - `name`: *Required.* Name of the pipeline
+    * `name`: *Required.* Name of the pipeline
 
-      - `config`: *Required.* Relative path (from source config file) to configuration file for pipeline
+    * `config`: *Required.* Relative path (from source config file) to configuration file for pipeline
 
-      - `vars`: *Optional.* Variables that can be passed to pipeline creation, see [fly documentation](https://concourse.ci/fly-set-pipeline.html) for more information.
+    * `vars`: *Optional.* Variables that can be passed to pipeline creation, see [fly documentation](https://concourse.ci/fly-set-pipeline.html) for more information.
 
-      - `vars_from`: *Optional.* Variable files that can be passed to pipeline creation, see [fly documentation](https://concourse.ci/fly-set-pipeline.html) for more information.
+    * `vars_from`: *Optional.* Variable files that can be passed to pipeline creation, see [fly documentation](https://concourse.ci/fly-set-pipeline.html) for more information.
 
 
 ### Example
