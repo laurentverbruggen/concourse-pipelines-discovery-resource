@@ -175,9 +175,9 @@ Submodules are initialized and updated recursively.
 
 * `disable_git_lfs`: *Optional.* If `true`, will not fetch Git LFS files.
 
-* `vars`: *Optional.* Adds vars to the resulting concourse configuration file.
+* `vars`: *Optional.* List of vars to add to the resulting concourse configuration file.
 
-* `vars_from`: *Optional.* Adds variable files to the resulting concourse configuration file and
+* `vars_from`: *Optional.* List of variable files to add to the resulting concourse configuration file and
   references them in the resource folder with the same relative path as passed for this config.
 
 Note: no depth parameter is defined (like in git resource) since it is useless here.
