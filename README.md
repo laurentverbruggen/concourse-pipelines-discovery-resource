@@ -17,8 +17,8 @@ resource_types:
     repository: laurentverbruggen/concourse-pipelines-discovery-resource
 ```
 
-See [concourse docs](http://concourse.ci/configuring-resource-types.html) for more details
-on adding `resource_types` to a pipeline config.
+
+See [concourse docs](http://concourse.ci/configuring-resource-types.html) for more details on adding `resource_types` to a pipeline config.
 
 ## Source Configuration
 
@@ -37,44 +37,31 @@ on adding `resource_types` to a pipeline config.
       -----END RSA PRIVATE KEY-----
     ```
 
+
 * `username`: *Optional.* Username for HTTP(S) auth when pulling/pushing.
-  This is needed when only HTTP/HTTPS protocol for git is available (which does not support private key auth)
-  and auth is required.
+  This is needed when only HTTP/HTTPS protocol for git is available (which does not support private key auth) and auth is required.
 
 * `password`: *Optional.* Password for HTTP(S) auth when pulling/pushing.
 
-* `paths`: *Optional.* If specified (as a list of glob patterns), only changes
-  to the specified files will yield new versions from `check`.
+* `paths`: *Optional.* If specified (as a list of glob patterns), only changes to the specified files will yield new versions from `check`.
 
-* `ignore_paths`: *Optional.* The inverse of `paths`; changes to the specified
-  files are ignored.
+* `ignore_paths`: *Optional.* The inverse of `paths`; changes to the specified files are ignored.
 
-* `skip_ssl_verification`: *Optional.* Skips git ssl verification by exporting
-  `GIT_SSL_NO_VERIFY=true`.
+* `skip_ssl_verification`: *Optional.* Skips git ssl verification by exporting `GIT_SSL_NO_VERIFY=true`.
 
-* `tag_filter`: *Optional*. If specified, the resource will only detect commits
-  that have a tag matching the specified expression. Patterns are
-  [glob(7)](http://man7.org/linux/man-pages/man7/glob.7.html) compatible (as
-  in, bash compatible).
+* `tag_filter`: *Optional*. If specified, the resource will only detect commits that have a tag matching the specified expression. Patterns are [glob(7)](http://man7.org/linux/man-pages/man7/glob.7.html) compatible (as in, bash compatible).
 
-* `git_config`: *Optional*. If specified as (list of pairs `name` and `value`)
-  it will configure git global options, setting each name with each value.
+* `git_config`: *Optional*. If specified as (list of pairs `name` and `value`) it will configure git global options, setting each name with each value.
 
   This can be useful to set options like `credential.helper` or similar.
 
-  See the [`git-config(1)` manual page](https://www.kernel.org/pub/software/scm/git/docs/git-config.html)
-  for more information and documentation of existing git options.
+  See the [`git-config(1)` manual page](https://www.kernel.org/pub/software/scm/git/docs/git-config.html) for more information and documentation of existing git options.
 
-* `disable_ci_skip`: *Optional* Allows for commits that have been labeled with `[ci skip]` or `[skip ci]`
-   previously to be discovered by the resource.
+* `disable_ci_skip`: *Optional* Allows for commits that have been labeled with `[ci skip]` or `[skip ci]` previously to be discovered by the resource.
 
-* `commit_verification_keys`: *Optional*. Array of GPG public keys that the
-  resource will check against to verify the commit (details below).
+* `commit_verification_keys`: *Optional*. Array of GPG public keys that the resource will check against to verify the commit (details below).
 
-* `commit_verification_key_ids`: *Optional*. Array of GPG public key ids that
-  the resource will check against to verify the commit (details below). The
-  corresponding keys will be fetched from the key server specified in
-  `gpg_keyserver`. The ids can be short id, long id or fingerprint.
+* `commit_verification_key_ids`: *Optional*. Array of GPG public key ids that the resource will check against to verify the commit (details below). The corresponding keys will be fetched from the key server specified in `gpg_keyserver`. The ids can be short id, long id or fingerprint.
 
 * `gpg_keyserver`: *Optional*. GPG keyserver to download the public keys from.
   Defaults to `hkp:///keys.gnupg.net/`.
@@ -115,6 +102,7 @@ resources:
     config: concourse_pipelines.json
 ```
 
+
 Fetching a repo and add credentials as variables file:
 
 ``` yaml
@@ -122,6 +110,7 @@ Fetching a repo and add credentials as variables file:
   vars_from:
   - source-code/credentials.yml
 ```
+
 
 Pipelines configuration file in repository:
 
@@ -139,16 +128,18 @@ Pipelines configuration file in repository:
 }
 ```
 
+
 ## Behavior
 
 ### `check`: Check for new commits on pipelines resources
 
 The repository is cloned (or pulled if already present), and any commits
-from the given version on are returned, but only if the HEAD contains changes (since the given version)
-on pipelines files. If no version is given, the ref for `HEAD` is returned.
+from the given version on are returned, but only if the HEAD contains changes
+(since the given version) on pipelines files. If no version is given, the ref
+for `HEAD` is returned.
 
-Any commits that contain the string `[ci skip]` will be ignored. This
-allows you to commit to your repository without triggering a new version.
+Any commits that contain the string `[ci skip]` will be ignored. This allows
+you to commit to your repository without triggering a new version.
 
 ### `in`: Clone the repository, at the given ref, and get the configuration and files of the pipelines
 
@@ -168,17 +159,16 @@ Submodules are initialized and updated recursively.
 
 #### Parameters
 
-* `submodules`: *Optional.* If `none`, submodules will not be
-  fetched. If specified as a list of paths, only the given paths will be
-  fetched. If not specified, or if `all` is explicitly specified, all
-  submodules are fetched.
+* `submodules`: *Optional.* If `none`, submodules will not be fetched.
+If specified as a list of paths, only the given paths will be fetched.
+If not specified, or if `all` is explicitly specified, all submodules are fetched.
 
 * `disable_git_lfs`: *Optional.* If `true`, will not fetch Git LFS files.
 
 * `vars`: *Optional.* List of vars to add to the resulting concourse configuration file.
 
 * `vars_from`: *Optional.* List of variable files to add to the resulting concourse configuration file and
-  references them in the resource folder with the same relative path as passed for this config.
+references them in the resource folder with the same relative path as passed for this config.
 
 Note: no depth parameter is defined (like in git resource) since it is useless here.
 
@@ -186,7 +176,7 @@ Note: no depth parameter is defined (like in git resource) since it is useless h
 
 If `commit_verification_keys` or `commit_verification_key_ids` is specified in
 the source configuration, it will additionally verify that the resulting commit
-has been GPG signed by one of the specified keys. It will error if this is not
+has been GPG signed by one of the specified keys. It will error if this is not 
 the case.
 
 ### `out`: No-Op
