@@ -128,7 +128,7 @@ jq -n "{
 # and put them in the destination directory after removing the original git repository
 config=$(jq -r '.source.config // "concourse.json"' < "$payload")
 
-vars=$(jq -r '.params.vars // []' < "$payload")
+vars=$(jq -r '.params.vars // {}' < "$payload")
 vars_from=$(jq -r '.params.vars_from // []' < "$payload")
 
 # if config file does not exist or isn't readable we exit with failure
@@ -180,7 +180,7 @@ if [ -n "$files" ]; then
     if echo "$current_branch" | grep -Ec "$pipeline_branch_regex" > /dev/null; then
       # add vars and vars_from to pipeline and expose branch variable
       pipeline=$(echo "$pipeline" | jq ". + {
-        vars: ( $vars + .vars + [ \"branch=$current_branch\" ]),
+        vars: ( $vars + .vars + { branch: \"$current_branch\" }),
         vars_from: ( $vars_from + .vars_from )
       }")
 

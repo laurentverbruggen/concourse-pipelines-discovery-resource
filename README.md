@@ -131,7 +131,10 @@ Pipelines configuration file in repository:
       "config": "ci/pipeline.yml",
       "vars_from": [
         "credentials.yml"
-      ]
+      ],
+      "vars": {
+        "message": "hello"
+      }
     }
   ]
 }
@@ -172,7 +175,7 @@ If not specified, or if `all` is explicitly specified, all submodules are fetche
 
 * `disable_git_lfs`: *Optional.* If `true`, will not fetch Git LFS files.
 
-* `vars`: *Optional.* List of vars to add to the resulting concourse configuration file.
+* `vars`: *Optional.* List of key-value vars to add to the resulting concourse configuration file.
 
 * `vars_from`: *Optional.* List of variable files to add to the resulting concourse configuration file and
 references them in the resource folder with the same relative path as passed for this config.
